@@ -1,0 +1,579 @@
+<!DOCTYPE html>
+<html lang="th" class="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="StockAlert">
+  <link rel="apple-touch-icon" href="https://cdn-icons-png.flaticon.com/512/2991/2991148.png">
+  <title>Stock Alert Pro | ระบบติดตามและแจ้งเตือนหุ้น</title>
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          colors: {
+            brand: {
+              50: '#f0fdf4',
+              500: '#10b981',
+              600: '#059669',
+            },
+            dark: {
+              900: '#0b0f19',
+              850: '#0f172a',
+              800: '#1e293b',
+              700: '#334155',
+            }
+          },
+          animation: {
+            'pulse-fast': 'pulse 1.2s cubic-bezier(0.4, 0, 0.6, 1) infinite',
+            'glow-alert': 'glowAlert 1.5s infinite alternate',
+          },
+          keyframes: {
+            glowAlert: {
+              '0%': { boxShadow: '0 0 5px rgba(239, 68, 68, 0.5), inset 0 0 5px rgba(239, 68, 68, 0.2)' },
+              '100%': { boxShadow: '0 0 20px rgba(239, 68, 68, 0.8), inset 0 0 10px rgba(239, 68, 68, 0.4)' },
+            }
+          }
+        }
+      }
+    }
+  </script>
+  <!-- Lucide Icons -->
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body class="bg-[#0b0f19] text-slate-100 min-h-screen flex flex-col font-sans antialiased selection:bg-emerald-500 selection:text-white">
+
+  <!-- Header -->
+  <header class="border-b border-slate-800 bg-[#0f172a]/90 backdrop-blur sticky top-0 z-40">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
+      
+      <!-- Logo & Status -->
+      <div class="flex items-center space-x-3">
+        <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-emerald-500 to-cyan-500 flex items-center justify-center shadow-lg shadow-emerald-500/20">
+          <i data-lucide="trending-up" class="w-6 h-6 text-white"></i>
+        </div>
+        <div>
+          <div class="flex items-center space-x-2">
+            <h1 class="font-bold text-lg text-white tracking-tight">Stock Alert Pro</h1>
+            <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-semibold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+              <span class="w-1.5 h-1.5 rounded-full bg-emerald-400 mr-1.5 animate-pulse"></span>
+              Live 1% Alert
+            </span>
+          </div>
+          <p class="text-xs text-slate-400">ระบบติดตามราคาและแจ้งเตือนหุ้น Shortlist</p>
+        </div>
+      </div>
+
+      <!-- Controls & Quick Actions -->
+      <div class="flex items-center space-x-2 sm:space-x-3">
+        
+        <!-- Refresh countdown / status -->
+        <div class="hidden md:flex items-center space-x-2 bg-slate-800/80 px-3 py-1.5 rounded-lg border border-slate-700/60 text-xs text-slate-300">
+          <i data-lucide="clock" class="w-3.5 h-3.5 text-slate-400"></i>
+          <span>อัปเดตล่าสุด: <span id="lastUpdatedTime" class="font-mono text-emerald-400">--:--:--</span></span>
+        </div>
+
+        <!-- Notification Permission Button -->
+        <button id="btnEnableNotifications" onclick="requestNotificationPermission()" class="hidden sm:inline-flex items-center space-x-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 transition" title="เปิดการแจ้งเตือนบนเบราว์เซอร์">
+          <i data-lucide="bell" class="w-3.5 h-3.5 text-amber-400"></i>
+          <span id="notifStatusText">เปิดแจ้งเตือน</span>
+        </button>
+
+        <!-- Sound Toggle Button -->
+        <button id="btnToggleSound" onclick="toggleSound()" class="p-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 transition" title="เปิด/ปิดเสียงแจ้งเตือน">
+          <i id="soundIcon" data-lucide="volume-2" class="w-4 h-4 text-emerald-400"></i>
+        </button>
+
+        <!-- Force Refresh Button -->
+        <button id="btnRefresh" onclick="refreshNow()" class="p-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 transition" title="รีเฟรชข้อมูลราคาตอนนี้">
+          <i id="refreshIcon" data-lucide="rotate-cw" class="w-4 h-4"></i>
+        </button>
+
+        <!-- Alert History Drawer Toggle -->
+        <button onclick="toggleAlertsDrawer()" class="relative p-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 transition" title="ประวัติการแจ้งเตือน">
+          <i data-lucide="inbox" class="w-4 h-4 text-cyan-400"></i>
+          <span id="alertCountBadge" class="hidden absolute -top-1 -right-1 px-1.5 py-0.2 text-[10px] font-bold rounded-full bg-rose-500 text-white animate-bounce">0</span>
+        </button>
+
+        <!-- Settings Button -->
+        <button onclick="openSettingsModal()" class="p-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 transition" title="ตั้งค่าระบบ">
+          <i data-lucide="settings" class="w-4 h-4"></i>
+        </button>
+
+        <!-- Cellular / Mobile Button -->
+        <button onclick="openCellularModal()" class="inline-flex items-center space-x-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-indigo-500/20 hover:bg-indigo-500/30 text-indigo-300 border border-indigo-500/40 transition" title="เชื่อมต่อผ่าน iPhone เน็ตมือถือ (4G/5G)">
+          <i data-lucide="smartphone" class="w-3.5 h-3.5"></i>
+          <span class="hidden sm:inline">เปิดบน iPhone (4G/5G)</span>
+        </button>
+
+        <!-- Add Stock Button -->
+        <button onclick="openAddStockModal()" class="inline-flex items-center space-x-1.5 px-3.5 py-1.5 rounded-lg text-xs sm:text-sm font-semibold bg-emerald-500 hover:bg-emerald-400 text-slate-950 shadow-md shadow-emerald-500/20 transition active:scale-95">
+          <i data-lucide="plus" class="w-4 h-4"></i>
+          <span>เพิ่มหุ้น</span>
+        </button>
+      </div>
+
+    </div>
+  </header>
+
+  <!-- Main Content Container -->
+  <main class="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6">
+
+    <!-- KPI Summary Cards -->
+    <div class="grid grid-cols-2 lg:grid-cols-4 gap-4">
+      
+      <!-- Total Shortlist -->
+      <div class="bg-[#0f172a] rounded-xl p-4 border border-slate-800 shadow-sm flex items-center justify-between">
+        <div>
+          <p class="text-xs font-medium text-slate-400">Shortlist ทั้งหมด</p>
+          <h3 id="statTotal" class="text-2xl font-bold text-white mt-1">0</h3>
+          <p class="text-[11px] text-slate-500 mt-0.5">หุ้นไทย (SET) & หุ้น US</p>
+        </div>
+        <div class="w-10 h-10 rounded-lg bg-blue-500/10 border border-blue-500/20 flex items-center justify-center text-blue-400">
+          <i data-lucide="layers" class="w-5 h-5"></i>
+        </div>
+      </div>
+
+      <!-- Approaching Alerts (<= 1%) -->
+      <div id="cardApproachingAlerts" class="bg-[#0f172a] rounded-xl p-4 border border-slate-800 shadow-sm flex items-center justify-between transition-all">
+        <div>
+          <p class="text-xs font-medium text-amber-400 flex items-center space-x-1">
+            <span>เข้าใกล้เป้าหมาย (≤ 1%)</span>
+            <span class="w-2 h-2 rounded-full bg-amber-400 animate-ping"></span>
+          </p>
+          <h3 id="statApproaching" class="text-2xl font-bold text-amber-400 mt-1">0</h3>
+          <p class="text-[11px] text-slate-400 mt-0.5">แจ้งเตือนระดับวิกฤต 1%</p>
+        </div>
+        <div class="w-10 h-10 rounded-lg bg-amber-500/10 border border-amber-500/20 flex items-center justify-center text-amber-400">
+          <i data-lucide="bell-ring" class="w-5 h-5"></i>
+        </div>
+      </div>
+
+      <!-- Target Hit -->
+      <div class="bg-[#0f172a] rounded-xl p-4 border border-slate-800 shadow-sm flex items-center justify-between">
+        <div>
+          <p class="text-xs font-medium text-emerald-400">ถึงเป้าหมายแล้ว (Hit)</p>
+          <h3 id="statReached" class="text-2xl font-bold text-emerald-400 mt-1">0</h3>
+          <p class="text-[11px] text-slate-500 mt-0.5">ราคาแตะจุด Action</p>
+        </div>
+        <div class="w-10 h-10 rounded-lg bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-emerald-400">
+          <i data-lucide="target" class="w-5 h-5"></i>
+        </div>
+      </div>
+
+      <!-- Closest Stock -->
+      <div class="bg-[#0f172a] rounded-xl p-4 border border-slate-800 shadow-sm flex items-center justify-between">
+        <div class="truncate mr-2">
+          <p class="text-xs font-medium text-slate-400">ตัวที่ใกล้เป้าหมายสุด</p>
+          <h3 id="statClosest" class="text-lg sm:text-xl font-bold text-white mt-1 truncate">-</h3>
+          <p id="statClosestDiff" class="text-[11px] text-slate-500 mt-0.5">ห่าง: -</p>
+        </div>
+        <div class="w-10 h-10 rounded-lg bg-purple-500/10 border border-purple-500/20 flex items-center justify-center text-purple-400 shrink-0">
+          <i data-lucide="radar" class="w-5 h-5"></i>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- Live Banner when Alert triggered -->
+    <div id="activeAlertBanner" class="hidden rounded-xl p-4 bg-gradient-to-r from-amber-500/20 via-rose-500/20 to-amber-500/20 border border-amber-500/40 animate-glow-alert flex items-center justify-between">
+      <div class="flex items-center space-x-3">
+        <div class="p-2 rounded-lg bg-amber-500/30 text-amber-300">
+          <i data-lucide="alert-triangle" class="w-6 h-6 animate-bounce"></i>
+        </div>
+        <div>
+          <h4 id="bannerTitle" class="font-bold text-amber-200 text-sm sm:text-base">ตรวจพบหุ้นที่เข้าใกล้เป้าหมายในระยะ 1%!</h4>
+          <p id="bannerDesc" class="text-xs sm:text-sm text-slate-300 mt-0.5">กรุณาตรวจสอบรายการด้านล่างเพื่อเตรียม Action</p>
+        </div>
+      </div>
+      <button onclick="dismissBanner()" class="text-xs px-3 py-1.5 rounded-lg bg-slate-800/80 hover:bg-slate-700 text-slate-200 border border-slate-600 transition">
+        รับทราบ
+      </button>
+    </div>
+
+    <!-- Watchlist Controls & Filters -->
+    <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-2">
+      
+      <!-- Filter Tabs -->
+      <div class="flex items-center space-x-1 p-1 bg-[#0f172a] rounded-xl border border-slate-800 text-xs overflow-x-auto">
+        <button onclick="setFilter('all')" id="tab-all" class="filter-tab px-3 py-1.5 rounded-lg font-medium bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 transition">
+          ทั้งหมด (<span id="countAll">0</span>)
+        </button>
+        <button onclick="setFilter('approaching')" id="tab-approaching" class="filter-tab px-3 py-1.5 rounded-lg font-medium text-slate-400 hover:text-white transition flex items-center space-x-1">
+          <span class="w-1.5 h-1.5 rounded-full bg-amber-400 mr-1"></span>
+          <span>ใกล้เป้า ≤ 1% (<span id="countApproaching">0</span>)</span>
+        </button>
+        <button onclick="setFilter('reached')" id="tab-reached" class="filter-tab px-3 py-1.5 rounded-lg font-medium text-slate-400 hover:text-white transition">
+          ถึงเป้าหมาย (<span id="countReached">0</span>)
+        </button>
+        <button onclick="setFilter('normal')" id="tab-normal" class="filter-tab px-3 py-1.5 rounded-lg font-medium text-slate-400 hover:text-white transition">
+          กำลังติดตาม (<span id="countNormal">0</span>)
+        </button>
+      </div>
+
+      <!-- Search in List & Sort -->
+      <div class="flex items-center space-x-2">
+        <div class="relative w-full sm:w-64">
+          <i data-lucide="search" class="w-4 h-4 text-slate-500 absolute left-3 top-1/2 -translate-y-1/2"></i>
+          <input type="text" id="filterInput" oninput="applyTableFilter()" placeholder="ค้นหาชื่อหุ้นหรือสัญลักษณ์..." 
+                 class="w-full bg-[#0f172a] border border-slate-800 rounded-xl pl-9 pr-3 py-1.5 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-emerald-500 transition">
+        </div>
+        <select id="sortBy" onchange="applyTableFilter()" class="bg-[#0f172a] border border-slate-800 rounded-xl px-3 py-1.5 text-xs text-slate-300 focus:outline-none focus:border-emerald-500">
+          <option value="proximity">เรียงตามระยะห่าง (ใกล้สุดก่อน)</option>
+          <option value="change">% เปลี่ยนแปลงประจำวัน</option>
+          <option value="symbol">สัญลักษณ์หุ้น (A-Z)</option>
+        </select>
+      </div>
+
+    </div>
+
+    <!-- Stocks Watchlist Cards / Table -->
+    <div class="bg-[#0f172a] rounded-2xl border border-slate-800 shadow-xl overflow-hidden">
+      
+      <!-- Desktop Table -->
+      <div class="overflow-x-auto">
+        <table class="w-full text-left text-xs border-collapse">
+          <thead>
+            <tr class="border-b border-slate-800/80 bg-slate-900/60 text-slate-400 font-semibold uppercase tracking-wider text-[11px]">
+              <th class="py-3.5 px-4">สัญลักษณ์ / หุ้น</th>
+              <th class="py-3.5 px-4 text-right">ราคาปัจจุบัน</th>
+              <th class="py-3.5 px-4 text-right">การเปลี่ยนแปลง</th>
+              <th class="py-3.5 px-4 text-right">ราคาเป้าหมาย</th>
+              <th class="py-3.5 px-4 text-center">ระยะห่างถึงเป้า</th>
+              <th class="py-3.5 px-4 text-center">สถานะการแจ้งเตือน (1%)</th>
+              <th class="py-3.5 px-4 text-center">กราฟย่อ (5D)</th>
+              <th class="py-3.5 px-4 text-right">จัดการ</th>
+            </tr>
+          </thead>
+          <tbody id="stocksTableBody" class="divide-y divide-slate-800/50">
+            <!-- Dynamic rows inserted via JavaScript -->
+            <tr>
+              <td colspan="8" class="text-center py-12 text-slate-500">
+                <div class="flex flex-col items-center justify-center space-y-2">
+                  <div class="w-8 h-8 border-2 border-emerald-500 border-t-transparent rounded-full animate-spin"></div>
+                  <p>กำลังโหลดข้อมูลราคาหุ้น...</p>
+                </div>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <!-- Empty state when no stocks match -->
+      <div id="emptyState" class="hidden text-center py-16 px-4">
+        <div class="w-14 h-14 rounded-2xl bg-slate-800/50 border border-slate-700/60 flex items-center justify-center mx-auto text-slate-400 mb-3">
+          <i data-lucide="layers" class="w-7 h-7"></i>
+        </div>
+        <h4 class="text-base font-semibold text-slate-200">ยังไม่มีหุ้นในรายการ</h4>
+        <p class="text-xs text-slate-400 max-w-sm mx-auto mt-1">กดปุ่ม "เพิ่มหุ้น" ด้านบน เพื่อค้นหาหุ้นไทย (SET) หรือหุ้นต่างประเทศที่ต้องการจับตาดู</p>
+        <button onclick="openAddStockModal()" class="mt-4 px-4 py-2 rounded-xl text-xs font-semibold bg-emerald-500 hover:bg-emerald-400 text-slate-950 transition">
+          + เพิ่มหุ้นตัวแรก
+        </button>
+      </div>
+
+    </div>
+
+  </main>
+
+  <!-- Add Stock Modal -->
+  <div id="addStockModal" class="hidden fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4">
+    <div class="bg-[#0f172a] border border-slate-700 rounded-2xl max-w-md w-full p-6 shadow-2xl space-y-4">
+      
+      <div class="flex items-center justify-between border-b border-slate-800 pb-3">
+        <div class="flex items-center space-x-2">
+          <div class="p-2 rounded-lg bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+            <i data-lucide="plus-circle" class="w-5 h-5"></i>
+          </div>
+          <div>
+            <h3 class="font-bold text-white text-base">เพิ่มหุ้นเข้า Shortlist</h3>
+            <p class="text-xs text-slate-400">รองรับทั้งหุ้นไทย (SET) และหุ้นสหรัฐฯ (US)</p>
+          </div>
+        </div>
+        <button onclick="closeAddStockModal()" class="text-slate-400 hover:text-white p-1 rounded-lg">
+          <i data-lucide="x" class="w-5 h-5"></i>
+        </button>
+      </div>
+
+      <!-- Search & Symbol Input -->
+      <div class="space-y-1 relative">
+        <label class="block text-xs font-medium text-slate-300">ค้นหาสัญลักษณ์หุ้น (เช่น PTT, DELTA, NVDA, AAPL)</label>
+        <div class="relative">
+          <input type="text" id="inputStockSearch" autocomplete="off" oninput="handleStockSearch(this.value)" placeholder="พิมพ์ชื่อหรือสัญลักษณ์หุ้น..." 
+                 class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3.5 py-2 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-emerald-500 transition uppercase">
+          <div id="searchSpinner" class="hidden absolute right-3 top-1/2 -translate-y-1/2">
+            <div class="w-4 h-4 border-2 border-emerald-500 border-t-transparent rounded-full animate-spin"></div>
+          </div>
+        </div>
+        
+        <!-- Autocomplete Dropdown List -->
+        <div id="searchDropdown" class="hidden absolute left-0 right-0 top-full mt-1 bg-slate-900 border border-slate-700 rounded-xl shadow-2xl max-h-56 overflow-y-auto z-20 divide-y divide-slate-800">
+        </div>
+      </div>
+
+      <!-- Selected Stock Details Preview -->
+      <div id="stockPreviewCard" class="hidden bg-slate-800/60 rounded-xl p-3 border border-slate-700/60 flex items-center justify-between">
+        <div>
+          <span id="previewSymbol" class="font-bold text-emerald-400 text-sm">PTT.BK</span>
+          <span id="previewExchange" class="ml-1 text-[10px] px-1.5 py-0.5 rounded bg-slate-700 text-slate-300">SET</span>
+          <p id="previewName" class="text-xs text-slate-300 truncate max-w-[200px]">PTT Public Company Limited</p>
+        </div>
+        <div class="text-right">
+          <span class="text-[10px] text-slate-400">ราคาปัจจุบัน</span>
+          <p id="previewPrice" class="font-bold text-white text-sm">--</p>
+        </div>
+      </div>
+
+      <!-- Target Price Input -->
+      <div class="space-y-1">
+        <div class="flex items-center justify-between">
+          <label class="block text-xs font-medium text-slate-300">ราคาเป้าหมาย (Target Price)</label>
+          <span id="priceQuickHints" class="text-[10px] text-emerald-400 space-x-1 cursor-pointer"></span>
+        </div>
+        <div class="relative">
+          <input type="number" step="any" id="inputTargetPrice" placeholder="เช่น 42.00 หรือ 215.50" 
+                 class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3.5 py-2 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-emerald-500 transition">
+        </div>
+      </div>
+
+      <!-- Alert Threshold & Direction -->
+      <div class="grid grid-cols-2 gap-3">
+        <div class="space-y-1">
+          <label class="block text-xs font-medium text-slate-300">ระยะแจ้งเตือน (%)</label>
+          <div class="relative">
+            <input type="number" step="0.1" id="inputThreshold" value="1.0" 
+                   class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-emerald-500 transition">
+            <span class="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-slate-500">%</span>
+          </div>
+          <p class="text-[10px] text-slate-400">แจ้งเตือนเมื่อห่างเป้าไม่เกิน 1%</p>
+        </div>
+
+        <div class="space-y-1">
+          <label class="block text-xs font-medium text-slate-300">ทิศทางแจ้งเตือน</label>
+          <select id="inputDirection" class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-emerald-500">
+            <option value="both">ทั้งสองด้าน (ขึ้น/ลงเข้าหาเป้า)</option>
+            <option value="below">กำลังขึ้นมาหาเป้า (จากล่าง)</option>
+            <option value="above">กำลังย่อลงมาหาเป้า (จากบน)</option>
+          </select>
+        </div>
+      </div>
+
+      <!-- Notes / Reason -->
+      <div class="space-y-1">
+        <label class="block text-xs font-medium text-slate-300">บันทึกช่วยจำ (Notes)</label>
+        <input type="text" id="inputNotes" placeholder="เช่น แนวรับสำคัญ 200 วัน, รอทดสอบ Breakout" 
+               class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3.5 py-2 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-emerald-500 transition">
+      </div>
+
+      <!-- Action buttons -->
+      <div class="pt-2 flex items-center justify-end space-x-2">
+        <button type="button" onclick="closeAddStockModal()" class="px-4 py-2 rounded-xl text-xs font-medium bg-slate-800 hover:bg-slate-700 text-slate-300 transition">
+          ยกเลิก
+        </button>
+        <button type="button" onclick="submitAddStock()" id="btnSubmitStock" class="px-5 py-2 rounded-xl text-xs font-semibold bg-emerald-500 hover:bg-emerald-400 text-slate-950 shadow-md shadow-emerald-500/20 transition">
+          บันทึกเข้า Shortlist
+        </button>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- Edit Stock Modal -->
+  <div id="editStockModal" class="hidden fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4">
+    <div class="bg-[#0f172a] border border-slate-700 rounded-2xl max-w-md w-full p-6 shadow-2xl space-y-4">
+      <div class="flex items-center justify-between border-b border-slate-800 pb-3">
+        <h3 class="font-bold text-white text-base">แก้ไขราคาเป้าหมาย & การแจ้งเตือน</h3>
+        <button onclick="closeEditStockModal()" class="text-slate-400 hover:text-white p-1 rounded-lg">
+          <i data-lucide="x" class="w-5 h-5"></i>
+        </button>
+      </div>
+      <input type="hidden" id="editStockId">
+      
+      <div class="p-3 bg-slate-800/60 rounded-xl border border-slate-700/60">
+        <span id="editStockSymbol" class="font-bold text-emerald-400 text-sm">--</span>
+        <p id="editStockName" class="text-xs text-slate-400">--</p>
+      </div>
+
+      <div class="space-y-1">
+        <label class="block text-xs font-medium text-slate-300">ราคาเป้าหมายใหม่ (Target Price)</label>
+        <input type="number" step="any" id="editTargetPrice" 
+               class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3.5 py-2 text-sm text-white focus:outline-none focus:border-emerald-500 transition">
+      </div>
+
+      <div class="grid grid-cols-2 gap-3">
+        <div class="space-y-1">
+          <label class="block text-xs font-medium text-slate-300">ระยะแจ้งเตือน (%)</label>
+          <input type="number" step="0.1" id="editThreshold" 
+                 class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-emerald-500 transition">
+        </div>
+        <div class="space-y-1">
+          <label class="block text-xs font-medium text-slate-300">ทิศทาง</label>
+          <select id="editDirection" class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-emerald-500">
+            <option value="both">ทั้งสองด้าน</option>
+            <option value="below">ขึ้นหาเป้า</option>
+            <option value="above">ย่อลงหาเป้า</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="space-y-1">
+        <label class="block text-xs font-medium text-slate-300">บันทึกช่วยจำ (Notes)</label>
+        <input type="text" id="editNotes" class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3.5 py-2 text-xs text-white focus:outline-none focus:border-emerald-500 transition">
+      </div>
+
+      <div class="pt-2 flex items-center justify-end space-x-2">
+        <button type="button" onclick="closeEditStockModal()" class="px-4 py-2 rounded-xl text-xs font-medium bg-slate-800 hover:bg-slate-700 text-slate-300 transition">
+          ยกเลิก
+        </button>
+        <button type="button" onclick="submitEditStock()" class="px-5 py-2 rounded-xl text-xs font-semibold bg-emerald-500 hover:bg-emerald-400 text-slate-950 transition">
+          บันทึกการเปลี่ยนแปลง
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Cellular / Remote Access Modal -->
+  <div id="cellularModal" class="hidden fixed inset-0 z-50 bg-black/75 backdrop-blur-sm flex items-center justify-center p-4">
+    <div class="bg-[#0f172a] border border-slate-700 rounded-2xl max-w-sm w-full p-6 shadow-2xl text-center space-y-4">
+      <div class="flex items-center justify-between border-b border-slate-800 pb-3">
+        <div class="flex items-center space-x-2 text-left">
+          <div class="p-2 rounded-lg bg-indigo-500/10 text-indigo-400 border border-indigo-500/20">
+            <i data-lucide="smartphone" class="w-5 h-5"></i>
+          </div>
+          <div>
+            <h3 class="font-bold text-white text-sm">เข้าใช้งานจาก iPhone (4G/5G)</h3>
+            <p class="text-[11px] text-slate-400">ผ่าน Cloudflare Secure Tunnel</p>
+          </div>
+        </div>
+        <button onclick="closeCellularModal()" class="text-slate-400 hover:text-white p-1 rounded-lg">
+          <i data-lucide="x" class="w-5 h-5"></i>
+        </button>
+      </div>
+
+      <!-- QR Code Display -->
+      <div class="bg-white p-4 rounded-2xl inline-block shadow-inner mx-auto">
+        <img id="cellularQrCode" src="" alt="QR Code สำหรับ iPhone" class="w-48 h-48 mx-auto rounded-lg">
+      </div>
+
+      <div class="space-y-2">
+        <p class="text-xs text-slate-300">
+          📱 ยกกล้อง <strong>iPhone</strong> ขึ้นมาสแกน QR Code เพื่อเปิดใน <strong>Safari</strong> ได้ทันที แม้ใช้เน็ตมือถืออยู่นอกบ้าน
+        </p>
+
+        <!-- URL Box with Copy Button -->
+        <div class="flex items-center space-x-1.5 bg-slate-900 border border-slate-700 rounded-xl p-1.5">
+          <input type="text" id="cellularUrlInput" readonly class="bg-transparent text-xs text-indigo-300 font-mono flex-1 px-2 focus:outline-none truncate">
+          <button onclick="copyCellularUrl()" class="px-3 py-1 bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg text-xs font-medium transition active:scale-95 flex items-center space-x-1">
+            <i data-lucide="copy" class="w-3.5 h-3.5"></i>
+            <span id="copyText">คัดลอก</span>
+          </button>
+        </div>
+      </div>
+
+      <div class="text-[11px] text-slate-400 text-left bg-slate-800/60 p-3 rounded-xl border border-slate-700/60 space-y-1">
+        <p class="font-semibold text-slate-200">💡 เคล็ดลับบน iPhone Safari:</p>
+        <p>1. เมื่อเปิดหน้าเว็บแล้ว แตะปุ่ม <strong>แชร์ (Share)</strong></p>
+        <p>2. เลือก <strong>"เพิ่มไปยังหน้าจอโฮม" (Add to Home Screen)</strong></p>
+        <p>3. จะได้ไอคอนแอปบนหน้าจอมือถือ เปิดเช็คราคาแบบเต็มจอได้ตลอดเวลา</p>
+      </div>
+
+      <button type="button" onclick="closeCellularModal()" class="w-full py-2 rounded-xl text-xs font-semibold bg-slate-800 hover:bg-slate-700 text-slate-300 transition">
+        ปิดหน้าต่าง
+      </button>
+    </div>
+  </div>
+
+  <!-- Settings Modal -->
+  <div id="settingsModal" class="hidden fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4">
+    <div class="bg-[#0f172a] border border-slate-700 rounded-2xl max-w-md w-full p-6 shadow-2xl space-y-4">
+      <div class="flex items-center justify-between border-b border-slate-800 pb-3">
+        <div class="flex items-center space-x-2">
+          <i data-lucide="sliders" class="w-5 h-5 text-emerald-400"></i>
+          <h3 class="font-bold text-white text-base">ตั้งค่าระบบแจ้งเตือน</h3>
+        </div>
+        <button onclick="closeSettingsModal()" class="text-slate-400 hover:text-white p-1 rounded-lg">
+          <i data-lucide="x" class="w-5 h-5"></i>
+        </button>
+      </div>
+
+      <div class="space-y-3">
+        <div class="space-y-1">
+          <label class="block text-xs font-medium text-slate-300">ความถี่ในการรีเฟรชราคาอัตโนมัติ (วินาที)</label>
+          <select id="settingInterval" class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-emerald-500">
+            <option value="5">ทุก 5 วินาที (เร็วพิเศษ)</option>
+            <option value="10">ทุก 10 วินาที</option>
+            <option value="15">ทุก 15 วินาที (แนะนำ)</option>
+            <option value="30">ทุก 30 วินาที</option>
+            <option value="60">ทุก 1 นาที</option>
+          </select>
+        </div>
+
+        <div class="space-y-1">
+          <label class="block text-xs font-medium text-slate-300">เกณฑ์เตือนเริ่มต้นเมื่อราคาเข้าใกล้เป้าหมาย (%)</label>
+          <div class="relative">
+            <input type="number" step="0.1" id="settingThreshold" class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-emerald-500">
+            <span class="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-slate-500">%</span>
+          </div>
+          <p class="text-[10px] text-slate-400">ระบบจะเตือนเมื่อราคาเข้าใกล้เป้าหมายไม่เกินค่านี้ (ค่าเริ่มต้น 1.0%)</p>
+        </div>
+
+        <div class="pt-2 border-t border-slate-800 space-y-2">
+          <div class="flex items-center justify-between">
+            <span class="text-xs text-slate-300">เปิดเสียงเตือน Chime (Audio Sound)</span>
+            <input type="checkbox" id="settingSound" class="w-4 h-4 rounded text-emerald-500 focus:ring-emerald-500">
+          </div>
+          <div class="flex items-center justify-between">
+            <span class="text-xs text-slate-300">เปิดแจ้งเตือน Browser Notification</span>
+            <input type="checkbox" id="settingBrowserNotif" class="w-4 h-4 rounded text-emerald-500 focus:ring-emerald-500">
+          </div>
+          <div class="flex items-center justify-between">
+            <span class="text-xs text-slate-300">เปิด Windows Desktop Toast Notification</span>
+            <input type="checkbox" id="settingDesktopToast" class="w-4 h-4 rounded text-emerald-500 focus:ring-emerald-500">
+          </div>
+        </div>
+
+        <div class="pt-2 flex items-center justify-between">
+          <button type="button" onclick="testAlertSystem()" class="text-xs px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-cyan-300 border border-cyan-500/30 flex items-center space-x-1">
+            <i data-lucide="play" class="w-3.5 h-3.5"></i>
+            <span>ทดสอบเสียง & การแจ้งเตือน</span>
+          </button>
+        </div>
+      </div>
+
+      <div class="pt-3 border-t border-slate-800 flex items-center justify-end space-x-2">
+        <button type="button" onclick="closeSettingsModal()" class="px-4 py-2 rounded-xl text-xs font-medium bg-slate-800 text-slate-300">ยกเลิก</button>
+        <button type="button" onclick="saveSettings()" class="px-5 py-2 rounded-xl text-xs font-semibold bg-emerald-500 hover:bg-emerald-400 text-slate-950">บันทึกการตั้งค่า</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Alert History Drawer -->
+  <div id="alertsDrawer" class="hidden fixed inset-y-0 right-0 z-50 w-full sm:w-96 bg-[#0f172a] border-l border-slate-800 shadow-2xl flex flex-col">
+    <div class="p-4 border-b border-slate-800 flex items-center justify-between">
+      <div class="flex items-center space-x-2">
+        <i data-lucide="history" class="w-5 h-5 text-cyan-400"></i>
+        <h3 class="font-bold text-white text-base">ประวัติการแจ้งเตือน</h3>
+      </div>
+      <div class="flex items-center space-x-2">
+        <button onclick="clearAlertHistory()" class="text-xs text-slate-400 hover:text-rose-400 transition" title="ล้างประวัติ">
+          ล้างทั้งหมด
+        </button>
+        <button onclick="toggleAlertsDrawer()" class="text-slate-400 hover:text-white p-1">
+          <i data-lucide="x" class="w-5 h-5"></i>
+        </button>
+      </div>
+    </div>
+    
+    <div id="alertsList" class="flex-1 overflow-y-auto p-4 space-y-3">
+      <!-- Dynamic alert items -->
+      <p class="text-center text-xs text-slate-500 py-8">ไม่มีประวัติการแจ้งเตือน</p>
+    </div>
+  </div>
+
+  <script src="/static/app.js"></script>
+</body>
+</html>
