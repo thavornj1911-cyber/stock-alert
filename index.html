@@ -116,17 +116,6 @@
           <i data-lucide="plus" class="w-4 h-4"></i>
           <span>เพิ่มหุ้น</span>
         </button>
-
-        <!-- User Profile & Logout -->
-        <div id="userProfileArea" class="hidden items-center space-x-1.5 pl-2 border-l border-slate-700">
-          <div class="flex items-center space-x-1 px-2.5 py-1 rounded-lg bg-slate-800 text-xs text-slate-300" title="ผู้ใช้งานปัจจุบัน">
-            <i data-lucide="user" class="w-3.5 h-3.5 text-emerald-400"></i>
-            <span id="navUserName" class="font-medium text-white max-w-[100px] truncate">--</span>
-          </div>
-          <button onclick="handleLogout()" class="p-1.5 rounded-lg bg-slate-800 hover:bg-rose-500/20 text-slate-400 hover:text-rose-400 border border-slate-700 transition" title="ออกจากระบบ">
-            <i data-lucide="log-out" class="w-4 h-4"></i>
-          </button>
-        </div>
       </div>
 
     </div>
@@ -582,89 +571,6 @@
     <div id="alertsList" class="flex-1 overflow-y-auto p-4 space-y-3">
       <!-- Dynamic alert items -->
       <p class="text-center text-xs text-slate-500 py-8">ไม่มีประวัติการแจ้งเตือน</p>
-    </div>
-  </div>
-
-  <!-- Authentication Modal (Login / Register) -->
-  <div id="authModal" class="hidden fixed inset-0 z-50 bg-black/85 backdrop-blur-md flex items-center justify-center p-4">
-    <div class="bg-[#0f172a] border border-slate-700 rounded-2xl max-w-sm w-full p-6 shadow-2xl space-y-4">
-      <!-- Header -->
-      <div class="text-center space-y-1">
-        <div class="w-12 h-12 rounded-2xl bg-gradient-to-tr from-emerald-500 to-cyan-500 flex items-center justify-center mx-auto shadow-lg shadow-emerald-500/20 mb-3">
-          <i data-lucide="trending-up" class="w-7 h-7 text-white"></i>
-        </div>
-        <h2 class="text-lg font-bold text-white tracking-tight">Stock Alert Pro</h2>
-        <p class="text-xs text-slate-400">เข้าสู่ระบบเพื่อจัดการ Shortlist ส่วนตัวของคุณ</p>
-      </div>
-
-      <!-- Tabs: Login vs Register -->
-      <div class="flex p-1 bg-slate-900 rounded-xl border border-slate-800 text-xs">
-        <button type="button" id="tabAuthLogin" onclick="switchAuthTab('login')" class="flex-1 py-1.5 rounded-lg font-semibold bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 transition">
-          เข้าสู่ระบบ
-        </button>
-        <button type="button" id="tabAuthRegister" onclick="switchAuthTab('register')" class="flex-1 py-1.5 rounded-lg font-medium text-slate-400 hover:text-white transition">
-          สมัครสมาชิกใหม่
-        </button>
-      </div>
-
-      <!-- Error Alert Box -->
-      <div id="authErrorMsg" class="hidden text-xs text-rose-400 bg-rose-500/10 border border-rose-500/20 p-2.5 rounded-xl text-center"></div>
-
-      <!-- Login Form -->
-      <form id="formLogin" onsubmit="submitLogin(event)" class="space-y-3">
-        <div class="space-y-1 text-left">
-          <label class="block text-xs font-medium text-slate-300">ชื่อผู้ใช้ (Username)</label>
-          <input type="text" id="loginUsername" required autocomplete="username" placeholder="เช่น demo, golf, tom" class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-emerald-500 transition">
-        </div>
-        <div class="space-y-1 text-left">
-          <label class="block text-xs font-medium text-slate-300">รหัสผ่าน (Password)</label>
-          <input type="password" id="loginPassword" required autocomplete="current-password" placeholder="••••••••" class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-emerald-500 transition">
-        </div>
-
-        <!-- Remember Me Checkbox -->
-        <div class="flex items-center justify-between py-1">
-          <label class="flex items-center space-x-2 text-xs text-slate-300 cursor-pointer select-none">
-            <input type="checkbox" id="loginRememberMe" checked class="w-4 h-4 rounded bg-slate-900 border-slate-700 text-emerald-500 focus:ring-emerald-500 cursor-pointer">
-            <span class="hover:text-white transition">ให้อยู่ในระบบต่อไป (จดจำฉันไว้)</span>
-          </label>
-        </div>
-
-        <button type="submit" id="btnLoginSubmit" class="w-full py-2.5 rounded-xl text-xs font-semibold bg-emerald-500 hover:bg-emerald-400 text-slate-950 shadow-md shadow-emerald-500/20 transition active:scale-95">
-          เข้าสู่ระบบ
-        </button>
-      </form>
-
-      <!-- Register Form -->
-      <form id="formRegister" onsubmit="submitRegister(event)" class="hidden space-y-3">
-        <div class="space-y-1 text-left">
-          <label class="block text-xs font-medium text-slate-300">ชื่อผู้ใช้ (Username ภาษาอังกฤษ)</label>
-          <input type="text" id="regUsername" required autocomplete="username" placeholder="เช่น myname" class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-emerald-500 transition">
-        </div>
-        <div class="space-y-1 text-left">
-          <label class="block text-xs font-medium text-slate-300">ชื่อที่ต้องการแสดง (Display Name)</label>
-          <input type="text" id="regDisplayName" placeholder="เช่น กอล์ฟ, John" class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-emerald-500 transition">
-        </div>
-        <div class="space-y-1 text-left">
-          <label class="block text-xs font-medium text-slate-300">รหัสผ่าน (Password อย่างน้อย 4 ตัว)</label>
-          <input type="password" id="regPassword" required autocomplete="new-password" placeholder="••••••••" class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-emerald-500 transition">
-        </div>
-
-        <!-- Remember Me for Register -->
-        <div class="flex items-center justify-between py-1">
-          <label class="flex items-center space-x-2 text-xs text-slate-300 cursor-pointer select-none">
-            <input type="checkbox" id="regRememberMe" checked class="w-4 h-4 rounded bg-slate-900 border-slate-700 text-cyan-500 focus:ring-cyan-500 cursor-pointer">
-            <span class="hover:text-white transition">ให้อยู่ในระบบต่อไป (จดจำฉันไว้)</span>
-          </label>
-        </div>
-
-        <button type="submit" id="btnRegSubmit" class="w-full py-2.5 rounded-xl text-xs font-semibold bg-cyan-500 hover:bg-cyan-400 text-slate-950 shadow-md shadow-cyan-500/20 transition active:scale-95">
-          สร้างบัญชีและเริ่มใช้งาน
-        </button>
-      </form>
-
-      <div class="pt-1 text-[11px] text-slate-400 text-center bg-slate-900/60 p-2 rounded-xl border border-slate-800">
-        💡 บัญชีทดลอง: <strong>demo</strong> / รหัสผ่าน: <strong>123456</strong>
-      </div>
     </div>
   </div>
 
