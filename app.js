@@ -1,10 +1,13 @@
-// Stock Alert Pro - Frontend Client Application
+// Stock Alert Pro - Multi-User Client Application
 
 let stocksData = [];
 let activeFilter = 'all';
 let ws = null;
 let reconnectTimer = null;
 let searchDebounceTimer = null;
+let authToken = localStorage.getItem("stock_auth_token") || null;
+let currentUser = null;
+
 let userSettings = {
   refresh_interval_sec: 15,
   default_threshold_pct: 1.0,
@@ -13,9 +16,196 @@ let userSettings = {
   desktop_toast: true
 };
 
-// --- Web Audio Synthesizer (Pleasant Alert Chime) ---
-let audioCtx = null;
+// --- Auth Fetch Helper ---
+async function authFetch(url, options = {}) {
+  options.headers = options.headers || {};
+  if (authToken) {
+    options.headers["Authorization"] = `Bearer ${authToken}`;
+  }
+  const res = await fetch(url, options);
+  if (res.status === 401) {
+    handleUnauthorized();
+    throw new Error("Unauthorized");
+  }
+  return res;
+}
 
+function handleUnauthorized() {
+  localStorage.removeItem("stock_auth_token");
+  authToken = null;
+  currentUser = null;
+  if (ws) {
+    ws.close();
+    ws = null;
+  }
+  showAuthModal();
+}
+
+// --- Auth Modal & UI Management ---
+function showAuthModal() {
+  const modal = document.getElementById("authModal");
+  if (modal) modal.classList.remove("hidden");
+  const userArea = document.getElementById("userProfileArea");
+  if (userArea) userArea.classList.add("hidden");
+}
+
+function hideAuthModal() {
+  const modal = document.getElementById("authModal");
+  if (modal) modal.classList.add("hidden");
+}
+
+function switchAuthTab(tab) {
+  const tabLogin = document.getElementById("tabAuthLogin");
+  const tabReg = document.getElementById("tabAuthRegister");
+  const formLogin = document.getElementById("formLogin");
+  const formReg = document.getElementById("formRegister");
+  const errBox = document.getElementById("authErrorMsg");
+  errBox.classList.add("hidden");
+
+  if (tab === "login") {
+    tabLogin.classList.add("bg-emerald-500/20", "text-emerald-400", "border-emerald-500/30", "font-semibold");
+    tabLogin.classList.remove("text-slate-400");
+    tabReg.classList.remove("bg-emerald-500/20", "text-emerald-400", "border-emerald-500/30", "font-semibold");
+    tabReg.classList.add("text-slate-400");
+    formLogin.classList.remove("hidden");
+    formReg.classList.add("hidden");
+  } else {
+    tabReg.classList.add("bg-emerald-500/20", "text-emerald-400", "border-emerald-500/30", "font-semibold");
+    tabReg.classList.remove("text-slate-400");
+    tabLogin.classList.remove("bg-emerald-500/20", "text-emerald-400", "border-emerald-500/30", "font-semibold");
+    tabLogin.classList.add("text-slate-400");
+    formReg.classList.remove("hidden");
+    formLogin.classList.add("hidden");
+  }
+}
+
+async function submitLogin(e) {
+  e.preventDefault();
+  const username = document.getElementById("loginUsername").value.trim();
+  const password = document.getElementById("loginPassword").value;
+  const errBox = document.getElementById("authErrorMsg");
+  const btn = document.getElementById("btnLoginSubmit");
+
+  errBox.classList.add("hidden");
+  btn.disabled = true;
+  btn.innerText = "กำลังเข้าสู่ระบบ...";
+
+  try {
+    const res = await fetch("/api/auth/login", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ username, password })
+    });
+    const data = await res.json();
+    if (!res.ok) {
+      throw new Error(data.detail || "เข้าสู่ระบบไม่สำเร็จ");
+    }
+
+    authToken = data.token;
+    currentUser = data.user;
+    localStorage.setItem("stock_auth_token", authToken);
+
+    hideAuthModal();
+    initUserDashboard();
+  } catch (err) {
+    errBox.innerText = err.message;
+    errBox.classList.remove("hidden");
+  } finally {
+    btn.disabled = false;
+    btn.innerText = "เข้าสู่ระบบ";
+  }
+}
+
+async function submitRegister(e) {
+  e.preventDefault();
+  const username = document.getElementById("regUsername").value.trim();
+  const displayName = document.getElementById("regDisplayName").value.trim();
+  const password = document.getElementById("regPassword").value;
+  const errBox = document.getElementById("authErrorMsg");
+  const btn = document.getElementById("btnRegSubmit");
+
+  errBox.classList.add("hidden");
+  btn.disabled = true;
+  btn.innerText = "กำลังสร้างบัญชี...";
+
+  try {
+    const res = await fetch("/api/auth/register", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ username, password, display_name: displayName })
+    });
+    const data = await res.json();
+    if (!res.ok) {
+      throw new Error(data.detail || "สมัครสมาชิกไม่สำเร็จ");
+    }
+
+    authToken = data.token;
+    currentUser = data.user;
+    localStorage.setItem("stock_auth_token", authToken);
+
+    hideAuthModal();
+    initUserDashboard();
+  } catch (err) {
+    errBox.innerText = err.message;
+    errBox.classList.remove("hidden");
+  } finally {
+    btn.disabled = false;
+    btn.innerText = "สร้างบัญชีและเริ่มใช้งาน";
+  }
+}
+
+async function handleLogout() {
+  if (authToken) {
+    try {
+      await fetch("/api/auth/logout", {
+        method: "POST",
+        headers: { "Authorization": `Bearer ${authToken}` }
+      });
+    } catch (e) {}
+  }
+  handleUnauthorized();
+}
+
+// --- Check Auth on Startup ---
+async function checkAuthAndInit() {
+  if (!authToken) {
+    showAuthModal();
+    return;
+  }
+
+  try {
+    const res = await fetch("/api/auth/me", {
+      headers: { "Authorization": `Bearer ${authToken}` }
+    });
+    if (!res.ok) {
+      throw new Error("Session expired");
+    }
+    currentUser = await res.json();
+    hideAuthModal();
+    initUserDashboard();
+  } catch (e) {
+    handleUnauthorized();
+  }
+}
+
+function initUserDashboard() {
+  // Update user header profile
+  const userArea = document.getElementById("userProfileArea");
+  const userName = document.getElementById("navUserName");
+  if (userArea && currentUser) {
+    userName.innerText = currentUser.display_name || currentUser.username;
+    userArea.classList.remove("hidden");
+    userArea.classList.add("flex");
+  }
+
+  connectWebSocket();
+  loadSettings();
+  loadAlertHistory();
+  refreshNow();
+}
+
+// --- Web Audio Synthesizer (Chime) ---
+let audioCtx = null;
 function getAudioContext() {
   if (!audioCtx) {
     const AudioContextClass = window.AudioContext || window.webkitAudioContext;
@@ -36,8 +226,6 @@ function playAlertSound() {
     if (!ctx) return;
 
     const now = ctx.currentTime;
-    
-    // Note 1: E5 (659.25 Hz)
     const osc1 = ctx.createOscillator();
     const gain1 = ctx.createGain();
     osc1.type = 'sine';
@@ -49,7 +237,6 @@ function playAlertSound() {
     osc1.start(now);
     osc1.stop(now + 0.4);
 
-    // Note 2: B5 (987.77 Hz) slightly delayed for chime effect
     const osc2 = ctx.createOscillator();
     const gain2 = ctx.createGain();
     osc2.type = 'sine';
@@ -60,7 +247,6 @@ function playAlertSound() {
     gain2.connect(ctx.destination);
     osc2.start(now + 0.15);
     osc2.stop(now + 0.7);
-
   } catch (err) {
     console.warn("Audio playback error:", err);
   }
@@ -124,7 +310,7 @@ function toggleSound() {
   if (userSettings.sound_enabled) {
     playAlertSound();
   }
-  fetch("/api/settings", {
+  authFetch("/api/settings", {
     method: "PUT",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ sound_enabled: userSettings.sound_enabled })
@@ -149,13 +335,19 @@ function updateSoundIcon() {
 
 // --- WebSocket Connection ---
 function connectWebSocket() {
+  if (!authToken) return;
+  if (ws) {
+    ws.close();
+    ws = null;
+  }
+
   const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
-  const wsUrl = `${protocol}//${window.location.host}/ws`;
+  const wsUrl = `${protocol}//${window.location.host}/ws?token=${encodeURIComponent(authToken)}`;
 
   ws = new WebSocket(wsUrl);
 
   ws.onopen = () => {
-    console.log("WebSocket connected to Stock Alert Server");
+    console.log("WebSocket connected for user:", currentUser?.username);
     if (reconnectTimer) {
       clearInterval(reconnectTimer);
       reconnectTimer = null;
@@ -191,16 +383,18 @@ function connectWebSocket() {
     }
   };
 
-  ws.onclose = () => {
-    console.log("WebSocket disconnected. Reconnecting in 3 seconds...");
-    if (!reconnectTimer) {
+  ws.onclose = (e) => {
+    if (e.code === 1008) {
+      handleUnauthorized();
+      return;
+    }
+    if (authToken && !reconnectTimer) {
       reconnectTimer = setTimeout(connectWebSocket, 3000);
     }
   };
 
   ws.onerror = (err) => {
-    console.warn("WebSocket error:", err);
-    ws.close();
+    ws?.close();
   };
 }
 
@@ -241,7 +435,6 @@ function updateKPIs() {
   document.getElementById("statApproaching").innerText = approachingCount;
   document.getElementById("statReached").innerText = reachedCount;
 
-  // Closest item card
   const statClosest = document.getElementById("statClosest");
   const statClosestDiff = document.getElementById("statClosestDiff");
   if (closestItem && minDiff !== Infinity) {
@@ -252,13 +445,11 @@ function updateKPIs() {
     statClosestDiff.innerText = "ห่าง: -";
   }
 
-  // Update tabs counters
   document.getElementById("countAll").innerText = total;
   document.getElementById("countApproaching").innerText = approachingCount;
   document.getElementById("countReached").innerText = reachedCount;
   document.getElementById("countNormal").innerText = normalCount;
 
-  // Pulse effect on Approaching KPI card if count > 0
   const cardApproaching = document.getElementById("cardApproachingAlerts");
   if (approachingCount > 0) {
     cardApproaching.classList.add("border-amber-500/80", "shadow-amber-500/20", "shadow-lg");
@@ -273,7 +464,6 @@ function renderStocksTable() {
   const searchInput = (document.getElementById("filterInput").value || "").trim().toLowerCase();
   const sortBy = document.getElementById("sortBy").value;
 
-  // Filter
   let filtered = stocksData.filter(item => {
     const prox = item.proximity || {};
     if (activeFilter === "approaching" && prox.status !== "APPROACHING") return false;
@@ -289,7 +479,6 @@ function renderStocksTable() {
     return true;
   });
 
-  // Sort
   filtered.sort((a, b) => {
     const aProx = a.proximity?.abs_diff_percent ?? 999;
     const bProx = b.proximity?.abs_diff_percent ?? 999;
@@ -312,7 +501,6 @@ function renderStocksTable() {
     const quote = item.quote || {};
     const prox = item.proximity || {};
     const price = quote.price !== undefined ? quote.price : null;
-    const prevClose = quote.previous_close;
     const change = quote.change || 0;
     const changePct = quote.change_percent || 0;
     const currency = quote.currency || (item.symbol.endsWith(".BK") ? "THB" : "USD");
@@ -326,7 +514,6 @@ function renderStocksTable() {
     const isApproaching = prox.status === "APPROACHING";
     const isReached = prox.status === "REACHED";
 
-    // Row highlight style
     let rowClasses = "hover:bg-slate-800/40 transition group";
     if (isApproaching) {
       rowClasses += " bg-amber-500/[0.04]";
@@ -334,7 +521,6 @@ function renderStocksTable() {
       rowClasses += " bg-emerald-500/[0.04]";
     }
 
-    // Proximity badge calculation
     let statusBadge = "";
     const threshold = item.alert_threshold_pct || userSettings.default_threshold_pct;
     const absDiff = prox.abs_diff_percent !== undefined && prox.abs_diff_percent !== null ? prox.abs_diff_percent : null;
@@ -363,17 +549,14 @@ function renderStocksTable() {
       statusBadge = `<span class="text-slate-500 text-[11px]">รอข้อมูลราคา...</span>`;
     }
 
-    // Proximity Progress Bar (0 to 100% closeness)
     let progressPercent = 0;
     if (absDiff !== null) {
-      // 0% diff = 100% progress; 10% diff = 0% progress
       progressPercent = Math.max(0, Math.min(100, Math.round(100 - (absDiff / 5) * 100)));
     }
     const barColor = isReached ? 'bg-emerald-400' : isApproaching ? 'bg-amber-400' : 'bg-slate-600';
 
     html += `
       <tr class="${rowClasses}" id="row-${item.id}">
-        <!-- Symbol & Name -->
         <td class="py-3 px-4">
           <div class="flex items-center space-x-2.5">
             <div class="w-8 h-8 rounded-lg ${isThai ? 'bg-blue-500/10 text-blue-400 border border-blue-500/20' : 'bg-indigo-500/10 text-indigo-400 border border-indigo-500/20'} flex items-center justify-center font-bold text-xs shrink-0">
@@ -389,7 +572,6 @@ function renderStocksTable() {
           </div>
         </td>
 
-        <!-- Current Price -->
         <td class="py-3 px-4 text-right">
           <span class="text-sm sm:text-base font-bold font-mono text-white" id="price-${item.id}">
             ${price !== null ? price.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 4 }) : '--'}
@@ -397,7 +579,6 @@ function renderStocksTable() {
           <span class="text-[10px] text-slate-400 ml-1 font-mono">${currency}</span>
         </td>
 
-        <!-- Daily Change -->
         <td class="py-3 px-4 text-right">
           <div class="inline-flex items-center px-2 py-0.5 rounded text-xs font-semibold font-mono ${changeBgClass} ${changeColorClass}">
             <i data-lucide="${isPositive ? 'arrow-up-right' : 'arrow-down-right'}" class="w-3.5 h-3.5 mr-0.5"></i>
@@ -405,7 +586,6 @@ function renderStocksTable() {
           </div>
         </td>
 
-        <!-- Target Price -->
         <td class="py-3 px-4 text-right">
           <span class="text-sm font-semibold font-mono text-cyan-300">
             ${item.target_price.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 4 })}
@@ -414,7 +594,6 @@ function renderStocksTable() {
           <p class="text-[10px] text-slate-500">เกณฑ์เตือน ≤ ${threshold}%</p>
         </td>
 
-        <!-- Distance to Target & Visual Gauge -->
         <td class="py-3 px-4 text-center">
           <div class="w-32 mx-auto space-y-1">
             <div class="flex items-center justify-between text-[10px] font-mono">
@@ -429,17 +608,14 @@ function renderStocksTable() {
           </div>
         </td>
 
-        <!-- Status (1% Alert) -->
         <td class="py-3 px-4 text-center">
           ${statusBadge}
         </td>
 
-        <!-- Sparkline mini chart -->
         <td class="py-3 px-4 text-center">
           <canvas id="spark-${item.id}" class="sparkline-canvas mx-auto" width="100" height="32"></canvas>
         </td>
 
-        <!-- Actions -->
         <td class="py-3 px-4 text-right">
           <div class="flex items-center justify-end space-x-1">
             ${isApproaching ? `
@@ -461,7 +637,6 @@ function renderStocksTable() {
 
   tbody.innerHTML = html;
 
-  // Render sparklines after DOM update
   filtered.forEach(item => {
     const quote = item.quote;
     if (quote && quote.sparkline && quote.sparkline.length > 2) {
@@ -478,7 +653,6 @@ function drawSparkline(canvasId, points, isPositive) {
   const h = canvas.height;
 
   ctx.clearRect(0, 0, w, h);
-
   const min = Math.min(...points);
   const max = Math.max(...points);
   const range = max - min || 1;
@@ -522,7 +696,10 @@ async function refreshNow() {
   const icon = document.getElementById("refreshIcon");
   if (icon) icon.classList.add("animate-spin");
   try {
-    await fetch("/api/refresh", { method: "POST" });
+    await authFetch("/api/refresh", { method: "POST" });
+    const res = await authFetch("/api/stocks");
+    stocksData = await res.json();
+    renderDashboard();
   } catch (err) {
     console.error("Refresh error:", err);
   } finally {
@@ -552,7 +729,7 @@ function dismissBanner() {
 
 // --- Acknowledge Alert ---
 async function acknowledgeAlert(stockId) {
-  await fetch(`/api/stocks/${stockId}/ack`, { method: "POST" });
+  await authFetch(`/api/stocks/${stockId}/ack`, { method: "POST" });
   const row = document.getElementById(`row-${stockId}`);
   if (row) {
     row.classList.remove("bg-amber-500/[0.04]");
@@ -641,7 +818,6 @@ async function selectSearchStock(item) {
   document.getElementById("inputStockSearch").value = item.symbol;
   document.getElementById("searchDropdown").classList.add("hidden");
 
-  // Show preview card and fetch current live price
   const preview = document.getElementById("stockPreviewCard");
   document.getElementById("previewSymbol").innerText = item.symbol;
   document.getElementById("previewExchange").innerText = item.exchange;
@@ -650,16 +826,10 @@ async function selectSearchStock(item) {
   preview.classList.remove("hidden");
 
   try {
-    const res = await fetch(`/api/search?q=${item.symbol}`);
-    // Also fetch quote from existing cache or api
-    const stockRes = await fetch(`/api/stocks`);
-    const all = await stockRes.json();
-    const existing = all.find(s => s.symbol === item.symbol);
+    const existing = stocksData.find(s => s.symbol === item.symbol);
     if (existing && existing.quote) {
       updatePreviewWithPrice(existing.quote.price, existing.quote.currency);
     } else {
-      // Trigger temporary preview price fetch
-      const testReq = await fetch(`/api/refresh`, { method: "POST" });
       document.getElementById("previewPrice").innerText = "พร้อมบันทึก";
     }
   } catch (e) {
@@ -671,7 +841,6 @@ async function selectSearchStock(item) {
 
 function updatePreviewWithPrice(price, currency) {
   document.getElementById("previewPrice").innerText = `${price.toLocaleString()} ${currency}`;
-  // Set quick hints (e.g. ±1%, ±2%)
   const hints = document.getElementById("priceQuickHints");
   const p1Up = (price * 1.01).toFixed(2);
   const p1Down = (price * 0.99).toFixed(2);
@@ -715,7 +884,7 @@ async function submitAddStock() {
       name: selectedSearchResult ? selectedSearchResult.name : rawSymbol
     };
 
-    const res = await fetch("/api/stocks", {
+    const res = await authFetch("/api/stocks", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(payload)
@@ -768,7 +937,7 @@ async function submitEditStock() {
   }
 
   try {
-    const res = await fetch(`/api/stocks/${stockId}`, {
+    const res = await authFetch(`/api/stocks/${stockId}`, {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -794,7 +963,7 @@ async function deleteStock(stockId, symbol) {
     return;
   }
   try {
-    const res = await fetch(`/api/stocks/${stockId}`, { method: "DELETE" });
+    const res = await authFetch(`/api/stocks/${stockId}`, { method: "DELETE" });
     if (res.ok) {
       stocksData = stocksData.filter(s => s.id !== stockId);
       renderDashboard();
@@ -807,7 +976,7 @@ async function deleteStock(stockId, symbol) {
 // --- Settings Modal ---
 async function loadSettings() {
   try {
-    const res = await fetch("/api/settings");
+    const res = await authFetch("/api/settings");
     userSettings = await res.json();
     document.getElementById("settingInterval").value = userSettings.refresh_interval_sec || 15;
     document.getElementById("settingThreshold").value = userSettings.default_threshold_pct || 1.0;
@@ -839,14 +1008,12 @@ async function saveSettings() {
   };
 
   try {
-    const res = await fetch("/api/settings", {
+    const res = await authFetch("/api/settings", {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(updates)
     });
     if (res.ok) {
-      userSettings = await res.json();
-      updateSoundIcon();
       closeSettingsModal();
       refreshNow();
     }
@@ -857,12 +1024,7 @@ async function saveSettings() {
 
 async function testAlertSystem() {
   playAlertSound();
-  showBrowserNotification("🔔 ทดสอบการแจ้งเตือนหุ้น", "ระบบแจ้งเตือนทำงานได้สมบูรณ์แบบ ทั้งเสียงและการแจ้งเตือนหน้าต่าง");
-  try {
-    await fetch("/api/test-alert", { method: "POST" });
-  } catch (e) {
-    console.warn(e);
-  }
+  showBrowserNotification("🔔 ทดสอบการแจ้งเตือนหุ้น", "ระบบแจ้งเตือนทำงานได้สมบูรณ์แบบ!");
 }
 
 // --- Alerts History Drawer ---
@@ -878,7 +1040,7 @@ function toggleAlertsDrawer() {
 
 async function loadAlertHistory() {
   try {
-    const res = await fetch("/api/alerts");
+    const res = await authFetch("/api/alerts");
     const alerts = await res.json();
     const container = document.getElementById("alertsList");
     const badge = document.getElementById("alertCountBadge");
@@ -913,7 +1075,7 @@ async function loadAlertHistory() {
 
 async function clearAlertHistory() {
   if (confirm("คุณต้องการล้างประวัติการแจ้งเตือนทั้งหมดหรือไม่?")) {
-    await fetch("/api/alerts", { method: "DELETE" });
+    await authFetch("/api/alerts", { method: "DELETE" });
     loadAlertHistory();
   }
 }
@@ -925,28 +1087,8 @@ async function openCellularModal() {
   const urlInput = document.getElementById("cellularUrlInput");
 
   modal.classList.remove("hidden");
-  urlInput.value = "กำลังโหลดลิงก์...";
-
-  try {
-    const res = await fetch("/api/tunnel");
-    const data = await res.json();
-    let tunnelUrl = data.url;
-
-    if (!tunnelUrl) {
-      // Trigger start if not running
-      await fetch("/api/tunnel/start", { method: "POST" });
-      urlInput.value = "กำลังสร้างช่องทางเชื่อมต่อ (รอ 3 วิ)...";
-      setTimeout(openCellularModal, 3000);
-      return;
-    }
-
-    urlInput.value = tunnelUrl;
-    // Generate QR Code using standard QR service
-    qrImg.src = `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(tunnelUrl)}`;
-  } catch (err) {
-    urlInput.value = "ไม่สามารถสร้างลิงก์ได้";
-    console.error(err);
-  }
+  urlInput.value = window.location.origin;
+  qrImg.src = `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(window.location.origin)}`;
   lucide.createIcons();
 }
 
@@ -967,10 +1109,7 @@ function copyCellularUrl() {
 
 // --- Initialization ---
 window.addEventListener("DOMContentLoaded", async () => {
-  await loadSettings();
   updateNotificationButton();
-  connectWebSocket();
-  loadAlertHistory();
 
   // Unlock iOS Safari Web Audio on first touch/click
   const unlockAudio = () => {
@@ -992,4 +1131,7 @@ window.addEventListener("DOMContentLoaded", async () => {
     if (e.target === setModal) closeSettingsModal();
     if (e.target === celModal) closeCellularModal();
   });
+
+  // Check login state
+  await checkAuthAndInit();
 });
