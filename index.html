@@ -620,6 +620,15 @@
           <label class="block text-xs font-medium text-slate-300">รหัสผ่าน (Password)</label>
           <input type="password" id="loginPassword" required autocomplete="current-password" placeholder="••••••••" class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-emerald-500 transition">
         </div>
+
+        <!-- Remember Me Checkbox -->
+        <div class="flex items-center justify-between py-1">
+          <label class="flex items-center space-x-2 text-xs text-slate-300 cursor-pointer select-none">
+            <input type="checkbox" id="loginRememberMe" checked class="w-4 h-4 rounded bg-slate-900 border-slate-700 text-emerald-500 focus:ring-emerald-500 cursor-pointer">
+            <span class="hover:text-white transition">ให้อยู่ในระบบต่อไป (จดจำฉันไว้)</span>
+          </label>
+        </div>
+
         <button type="submit" id="btnLoginSubmit" class="w-full py-2.5 rounded-xl text-xs font-semibold bg-emerald-500 hover:bg-emerald-400 text-slate-950 shadow-md shadow-emerald-500/20 transition active:scale-95">
           เข้าสู่ระบบ
         </button>
@@ -639,6 +648,15 @@
           <label class="block text-xs font-medium text-slate-300">รหัสผ่าน (Password อย่างน้อย 4 ตัว)</label>
           <input type="password" id="regPassword" required autocomplete="new-password" placeholder="••••••••" class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-emerald-500 transition">
         </div>
+
+        <!-- Remember Me for Register -->
+        <div class="flex items-center justify-between py-1">
+          <label class="flex items-center space-x-2 text-xs text-slate-300 cursor-pointer select-none">
+            <input type="checkbox" id="regRememberMe" checked class="w-4 h-4 rounded bg-slate-900 border-slate-700 text-cyan-500 focus:ring-cyan-500 cursor-pointer">
+            <span class="hover:text-white transition">ให้อยู่ในระบบต่อไป (จดจำฉันไว้)</span>
+          </label>
+        </div>
+
         <button type="submit" id="btnRegSubmit" class="w-full py-2.5 rounded-xl text-xs font-semibold bg-cyan-500 hover:bg-cyan-400 text-slate-950 shadow-md shadow-cyan-500/20 transition active:scale-95">
           สร้างบัญชีและเริ่มใช้งาน
         </button>

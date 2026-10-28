@@ -5,7 +5,7 @@ let activeFilter = 'all';
 let ws = null;
 let reconnectTimer = null;
 let searchDebounceTimer = null;
-let authToken = localStorage.getItem("stock_auth_token") || null;
+let authToken = localStorage.getItem("stock_auth_token") || sessionStorage.getItem("stock_auth_token") || null;
 let currentUser = null;
 
 let userSettings = {
@@ -32,6 +32,7 @@ async function authFetch(url, options = {}) {
 
 function handleUnauthorized() {
   localStorage.removeItem("stock_auth_token");
+  sessionStorage.removeItem("stock_auth_token");
   authToken = null;
   currentUser = null;
   if (ws) {
@@ -103,7 +104,16 @@ async function submitLogin(e) {
 
     authToken = data.token;
     currentUser = data.user;
-    localStorage.setItem("stock_auth_token", authToken);
+    
+    // Check Remember Me checkbox for login
+    const rememberMe = document.getElementById("loginRememberMe") ? document.getElementById("loginRememberMe").checked : true;
+    if (rememberMe) {
+      localStorage.setItem("stock_auth_token", authToken);
+      sessionStorage.removeItem("stock_auth_token");
+    } else {
+      sessionStorage.setItem("stock_auth_token", authToken);
+      localStorage.removeItem("stock_auth_token");
+    }
 
     hideAuthModal();
     initUserDashboard();
@@ -141,7 +151,16 @@ async function submitRegister(e) {
 
     authToken = data.token;
     currentUser = data.user;
-    localStorage.setItem("stock_auth_token", authToken);
+    
+    // Check Remember Me checkbox for register
+    const rememberMe = document.getElementById("regRememberMe") ? document.getElementById("regRememberMe").checked : true;
+    if (rememberMe) {
+      localStorage.setItem("stock_auth_token", authToken);
+      sessionStorage.removeItem("stock_auth_token");
+    } else {
+      sessionStorage.setItem("stock_auth_token", authToken);
+      localStorage.removeItem("stock_auth_token");
+    }
 
     hideAuthModal();
     initUserDashboard();
